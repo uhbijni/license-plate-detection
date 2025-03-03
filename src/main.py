@@ -1,60 +1,116 @@
 import torchvision
 import torch
+import os
 from detection.detector import LicensePlateDetector
 from utils.image_utils import load_image, save_image
-from torch.utils.data import DataLoader
+from utils.visualization import draw_bounding_boxes
+from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from detection.dataset import LicensePlateDataset
 
 
-
 def main():
     # Initialize the license plate detector
-    #detector = LicensePlateDetector()
-    #detector.load_model()
+    # detector = LicensePlateDetector()
+    # detector.load_model()
 
     # Define any transformations
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-    ])
+    transform = transforms.Compose(
+        [
+            transforms.ToTensor(),
+        ]
+    )
 
     # Create the dataset and dataloader
-    dataset = LicensePlateDataset(image_dir='C:\\Code\\license-plate-detection\\archive\\images', annotation_dir='C:\\Code\\license-plate-detection\\archive\\annotations', transform=transform)
-    dataloader = DataLoader(dataset, batch_size=8, shuffle=True, collate_fn=lambda x: tuple(zip(*x)))
+    dataset = LicensePlateDataset(
+        image_dir="C:\\Code\\license-plate-detection\\archive\\images",
+        annotation_dir="C:\\Code\\license-plate-detection\\archive\\annotations",
+        transform=transform,
+    )
+    # Define the train-test split ratio
+    train_size = int(0.8 * len(dataset))
+    test_size = len(dataset) - train_size
+    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
-    
+    # Create the dataloaders
+    train_dataloader = DataLoader(
+        train_dataset, batch_size=8, shuffle=True, collate_fn=lambda x: tuple(zip(*x))
+    )
+    test_dataloader = DataLoader(
+        test_dataset, batch_size=8, shuffle=False, collate_fn=lambda x: tuple(zip(*x))
+    )
 
     model = torchvision.models.detection.fasterrcnn_resnet50_fpn()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.005, momentum=0.9, weight_decay=0.0005)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+    # Load the trained model
+    if os.path.exists("fasterrcnn_resnet50_fpn.pth"):
+        model.load_state_dict(
+            torch.load("fasterrcnn_resnet50_fpn.pth", weights_only=True)
+        )
 
-    num_epochs = 30
+    else:
+        optimizer = torch.optim.SGD(
+            model.parameters(), lr=0.005, momentum=0.9, weight_decay=0.0005
+        )
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer, step_size=3, gamma=0.1
+        )
 
-    for epoch in range(num_epochs):
-        epoch_loss = 0
-        for images, targets in dataloader:
+        num_epochs = 30
+
+        for epoch in range(num_epochs):
+            epoch_loss = 0
+            for images, targets in train_dataloader:
+                images = list(image.to(device) for image in images)
+                targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+
+                loss_dict = model(images, targets)
+
+                losses = sum(loss for loss in loss_dict.values())
+
+                optimizer.zero_grad()
+                losses.backward()
+                optimizer.step()
+                epoch_loss += losses.item()
+
+            lr_scheduler.step()
+            print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss}")
+
+        torch.save(model.state_dict(), "fasterrcnn_resnet50_fpn.pth")
+
+    # Set model to evaluation mode, ensuring that layers like dropout and batchnorm are operating in evaluation mode.
+    model.eval()
+    j = 0
+    with torch.no_grad():
+        for images, targets in test_dataloader:
+
             images = list(image.to(device) for image in images)
-            targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+            predictions = model(images)
 
-            loss_dict = model(images, targets)
+            for i in range(len(predictions)):
+                if len(predictions[i]["boxes"]) == 0:
+                    continue
 
-            losses = sum(loss for loss in loss_dict.values())
+                """
+                print(f"Image {i+1} predictions: {predictions[i]['boxes'][0]}")
+                print(f"Image {i+1} ground truth: {targets[i]['boxes']}")
+                print("\n")
+                """
 
-            optimizer.zero_grad()
-            losses.backward()
-            optimizer.step()   
-            epoch_loss += losses.item()
+                image = transforms.ToPILImage()(images[i].cpu())
+                image_with_boxes = draw_bounding_boxes(
+                    image,
+                    predictions[i]["boxes"][0].cpu().numpy(),
+                    targets[i]["boxes"][0].cpu().numpy(),
+                )
+                image_with_boxes.save(
+                    f"C:\\Code\\license-plate-detection\\evaluation\\epoch_{j+1}_output_image_{i+1}.png"
+                )
 
-        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss}") 
-
-    torch.save(model.state_dict(), 'fasterrcnn_resnet50_fpn.pth')
+            j += 1
 
 
-
-   
 if __name__ == "__main__":
     main()
-

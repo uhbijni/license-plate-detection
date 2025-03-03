@@ -1,2 +1,6 @@
 archive
 fasterrcnn_resnet50_fpn.pth
+src/__pycache__/*
+src/detection/__pycache__/*
+src/utils/__pycache__/*
+evaluation/*

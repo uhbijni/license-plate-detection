@@ -7,10 +7,6 @@ from PIL import Image
 import xml.etree.ElementTree as ET
 from torchvision import transforms
 
-
-
-
-
 class LicensePlateDataset(Dataset):
     def __init__(self, image_dir, annotation_dir, transform=None):
         self.image_dir = image_dir
