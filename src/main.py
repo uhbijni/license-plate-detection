@@ -3,7 +3,8 @@ import torch
 import os
 from detection.detector import LicensePlateDetector
 from utils.image_utils import load_image, save_image
-from utils.visualization import draw_bounding_boxes
+from utils.visualization_utils import draw_boxes_text
+from utils.ocr_utils import extract_text_from_box
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from detection.dataset import LicensePlateDataset
@@ -100,12 +101,17 @@ def main():
                 """
 
                 image = transforms.ToPILImage()(images[i].cpu())
-                image_with_boxes = draw_bounding_boxes(
+                plate_text = extract_text_from_box(
+                    image, targets[i]["boxes"][0].cpu().numpy()
+                )
+                image_with_boxes_text = draw_boxes_text(
                     image,
                     predictions[i]["boxes"][0].cpu().numpy(),
                     targets[i]["boxes"][0].cpu().numpy(),
+                    plate_text,
                 )
-                image_with_boxes.save(
+
+                image_with_boxes_text.save(
                     f"C:\\Code\\license-plate-detection\\evaluation\\epoch_{j+1}_output_image_{i+1}.png"
                 )
 
