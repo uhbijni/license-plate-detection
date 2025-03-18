@@ -85,10 +85,12 @@ def main():
     model.eval()
     j = 0
     with torch.no_grad():
+        bad_ocr = 0
         for images, targets in test_dataloader:
 
             images = list(image.to(device) for image in images)
             predictions = model(images)
+
 
             for i in range(len(predictions)):
                 if len(predictions[i]["boxes"]) == 0:
@@ -104,6 +106,9 @@ def main():
                 plate_text = extract_text_from_box(
                     image, targets[i]["boxes"][0].cpu().numpy()
                 )
+                if plate_text == "no text detected!" or plate_text == "bounding box too small!":
+                    bad_ocr += 1    
+                
                 image_with_boxes_text = draw_boxes_text(
                     image,
                     predictions[i]["boxes"][0].cpu().numpy(),
@@ -116,6 +121,7 @@ def main():
                 )
 
             j += 1
+        print(f"Bad OCR: {bad_ocr}")
 
 
 if __name__ == "__main__":
