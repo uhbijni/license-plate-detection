@@ -26,7 +26,7 @@ def main():
     dataset = LicensePlateDataset(
         image_dir="C:\\Code\\license-plate-detection\\archive\\images",
         annotation_dir="C:\\Code\\license-plate-detection\\archive\\annotations",
-        transform=transform,
+        transform=transform,    
     )
     # Define the train-test split ratio
     train_size = int(0.8 * len(dataset))

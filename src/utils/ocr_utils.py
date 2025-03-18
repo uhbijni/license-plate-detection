@@ -1,5 +1,5 @@
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageFilter
 
 
 def extract_text_from_box(image, box):
@@ -16,6 +16,7 @@ def extract_text_from_box(image, box):
 
     xmin, ymin, xmax, ymax = box
     cropped_image = image.crop((xmin, ymin, xmax, ymax))
+    cropped_image = preprocess_image(cropped_image)
     if (xmax - xmin < 2) or (ymax - ymin < 2):
         return "bounding box too small!"
 
@@ -24,3 +25,25 @@ def extract_text_from_box(image, box):
         return "no text detected!"
 
     return text
+
+def preprocess_image(image):
+    """
+    Preprocesses the input image.
+
+    Args:
+        image (PIL.Image): The input image.
+
+    Returns:
+        PIL.Image: The preprocessed image.
+    """
+    image = image.convert('L')
+    
+    # Apply thresholding
+    #threshold = 50
+    #image = image.point(lambda p: 255 if p > threshold else 0)
+    
+    #image.show()
+    #print("test")
+
+
+    return image
